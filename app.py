@@ -190,8 +190,6 @@ def extract_text_from_pdf(uploaded_file) -> str:
     return "\n".join(page.get_text() for page in doc)
 
 
-from groq import Groq
-
 def analyze_claims(text: str, api_key: str) -> list:
     # Groq client initialize
     client = Groq(api_key=api_key)
