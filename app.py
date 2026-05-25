@@ -1,6 +1,6 @@
 import streamlit as st
 import fitz  # PyMuPDF
-from google import genai
+from groq import Groq  # Google genai hataya
 import json
 import re
 
@@ -190,9 +190,12 @@ def extract_text_from_pdf(uploaded_file) -> str:
     return "\n".join(page.get_text() for page in doc)
 
 
-def analyze_claims(text: str, api_key: str) -> list:
-    client = genai.Client(api_key=api_key)
+from groq import Groq
 
+def analyze_claims(text: str, api_key: str) -> list:
+    # Groq client initialize
+    client = Groq(api_key=api_key)
+    
     prompt = f"""
 You are an expert fact-checker AI. Analyze the following document text and:
 
@@ -222,13 +225,21 @@ Document text:
 {text[:8000]}
 \"\"\"
 """
-
-    resp = client.models.generate_content(
-        model="gemini-2.0-flash",
-        contents=prompt,
+    
+    # Groq API call (use Llama or Mixtral model)
+    response = client.chat.completions.create(
+        model="llama-3.1-70b-versatile",  # ya "mixtral-8x7b-32768"
+        messages=[
+            {"role": "system", "content": "You are a fact-checking AI. Always respond with valid JSON only."},
+            {"role": "user", "content": prompt}
+        ],
+        temperature=0.1,
+        response_format={"type": "json_object"}  # Force JSON output
     )
-
-    raw = resp.text.strip()
+    
+    raw = response.choices[0].message.content.strip()
+    # Clean markdown if present
+    import re
     raw = re.sub(r"^```json\s*", "", raw)
     raw = re.sub(r"```$", "", raw)
     return json.loads(raw)
@@ -245,10 +256,10 @@ st.markdown("""
 
 st.markdown('<div class="section-label">🔑 Configuration</div>', unsafe_allow_html=True)
 api_key = st.text_input(
-    "Gemini API Key",
+    "Groq API Key",
     type="password",
-    placeholder="Paste your Gemini API key here...",
-    help="Get your free key at aistudio.google.com",
+    placeholder="Paste your Groq API key here...",
+    help="Get your free key at console.groq.com",
 )
 
 st.markdown("<br>", unsafe_allow_html=True)
@@ -267,7 +278,7 @@ run = st.button("🔍 ANALYZE & FACT-CHECK")
 
 if run:
     if not api_key:
-        st.error("⚠️ Please enter your Gemini API key above.")
+        st.error("⚠️ Please enter your Groq API key above.")
     elif not uploaded_file:
         st.error("⚠️ Please upload a PDF document first.")
     else:
@@ -277,7 +288,7 @@ if run:
         if len(doc_text.strip()) < 50:
             st.error("Could not extract readable text. Try a text-based PDF.")
         else:
-            with st.spinner("🤖 Gemini AI is analyzing claims..."):
+            with st.spinner("🤖 Groq AI is analyzing claims..."):
                 try:
                     claims = analyze_claims(doc_text, api_key)
                 except Exception as e:
@@ -333,4 +344,4 @@ if run:
 </div>""", unsafe_allow_html=True)
                     st.markdown("<br>", unsafe_allow_html=True)
 
-st.markdown('<div class="footer-text">FACTGUARD AI · POWERED BY GEMINI · BUILT FOR COG CULTURE ASSESSMENT</div>', unsafe_allow_html=True)
+st.markdown('<div class="footer-text">FACTGUARD AI · POWERED BY GROQ · BUILT FOR COG CULTURE ASSESSMENT</div>', unsafe_allow_html=True)
