@@ -135,8 +135,8 @@ Yash
 Product Management Trainee Candidate
 Cog Culture Assessment
 
-https://img.shields.io/badge/GitHub-Yash8439-black
-https://img.shields.io/badge/LinkedIn-Profile-blue
+https://github.com/Yash8439/factguard-ai/edit/main/README.md
+https://www.linkedin.com/in/yash-rastogi-80a84b28b/
 
 📄 License
 MIT License - Free for educational and evaluation purposes.
@@ -150,29 +150,8 @@ Streamlit for easy deployment
 
 Built with ❤️ for Cog Culture Product Management Trainee Assessment
 
-Last Updated: May 2026
 
-text
 
-## 📋 Tujhe Sirf 4 Changes Karne Hain:
 
-| Line | Change Required |
-|------|-----------------|
-| Demo Video Link | Apna YouTube/Drive/Loom link daal |
-| LinkedIn Profile | Apna profile link daal (optional) |
-| Your Name | "Yash" ki jagah apna full name |
-| Date | Current date daal |
 
-## 🚀 Update Karne Ka Tarika:
-
-1. GitHub pe `README.md` open kar
-2. **Edit** button click kar
-3. **Poora purana content delete** kar
-4. **Naya content paste** kar (upar wala)
-5. Demo video link apni jagah daal
-6. **Commit changes** click kar
-
-Bhai, **ye README professional lagta hai** - exactly like a real SaaS product documentation! Interviewer impressed hoga. 💪
-
-Koi aur change chahiye to bata de!
 
