@@ -1,42 +1,30 @@
 # FactGuard AI 🔍
 
-An AI-powered **Fact-Checking Web App** that automatically verifies claims in PDF documents using Google Gemini.
+An AI-powered **Fact-Checking Web App** that automatically verifies claims in PDF documents using Groq's Llama 3.3 70B model.
 
 ## 🚀 Live Demo
-[Click here to try the app](https://your-app.streamlit.app) ← update after deploy
+https://factguard-ai-2etssbphxqcr2ppfxjitnd.streamlit.app/
 
 ## ✨ Features
 - 📄 Upload any PDF document
 - 🤖 AI extracts all verifiable claims (stats, dates, figures)
-- 🌐 Cross-references claims against Gemini's knowledge
-- 🚨 Flags claims as **Verified**, **Inaccurate**, or **False**
+- 🌐 Cross-references claims against Llama 3.3's knowledge base
+- 🚨 Flags claims as **Verified** ✅, **Inaccurate** ⚠️, or **False** ❌
 - 📊 Summary dashboard with claim breakdown
+- 📜 History tracking of all analyses
+- 📥 Export reports as JSON
 
 ## 🛠️ Tech Stack
 - **Frontend:** Streamlit
-- **AI Engine:** Google Gemini 1.5 Flash
+- **AI Engine:** Groq (Llama 3.3 70B)
 - **PDF Parsing:** PyMuPDF (fitz)
 - **Deployment:** Streamlit Cloud
+- **Language:** Python
 
 ## 📦 Installation (Local)
 
 ```bash
-git clone https://github.com/yourusername/factguard-ai
+git clone https://github.com/Yash8439/factguard-ai
 cd factguard-ai
 pip install -r requirements.txt
 streamlit run app.py
-```
-
-## 🔑 Setup
-1. Get a free Gemini API key from [aistudio.google.com](https://aistudio.google.com)
-2. Paste it in the app's API key field
-3. Upload a PDF and click **Analyze**
-
-## 📋 How It Works
-1. **Extract** — PyMuPDF parses the PDF and extracts all text
-2. **Analyze** — Gemini AI identifies specific, verifiable claims
-3. **Verify** — Each claim is checked against known facts
-4. **Report** — Results flagged as Verified ✅, Inaccurate ⚠️, or False 🚨
-
-## 🎯 Built For
-Cog Culture — Product Management Trainee Assessment
