@@ -1,6 +1,6 @@
 import streamlit as st
 import fitz  # PyMuPDF
-from groq import Groq  # Google genai hataya
+from groq import Groq
 import json
 import re
 
@@ -191,11 +191,10 @@ def extract_text_from_pdf(uploaded_file) -> str:
 
 
 def analyze_claims(text: str, api_key: str) -> list:
-    # Groq client initialize
+    """Groq API se fact-checking with robust error handling"""
     client = Groq(api_key=api_key)
     
-    prompt = f"""
-You are an expert fact-checker AI. Analyze the following document text and:
+    prompt = f"""You are an expert fact-checker AI. Analyze the following document text and:
 
 1. Extract ALL specific, verifiable claims — focus on:
    - Statistics and numbers (e.g., "X% of users", "revenue of $Y billion")
@@ -218,29 +217,67 @@ Return a JSON array of objects. Each object must have EXACTLY these keys:
 
 Extract at least 5 claims. Return ONLY valid JSON. No markdown, no preamble.
 
+Example response:
+[
+  {{"claim": "Example claim", "status": "Verified", "explanation": "This is correct because..."}}
+]
+
 Document text:
 \"\"\"
-{text[:8000]}
+{text[:6000]}
 \"\"\"
 """
     
-    # Groq API call (use Llama or Mixtral model)
-    response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",  # ya "mixtral-8x7b-32768"
-        messages=[
-            {"role": "system", "content": "You are a fact-checking AI. Always respond with valid JSON only."},
-            {"role": "user", "content": prompt}
-        ],
-        temperature=0.1,
-        response_format={"type": "json_object"}  # Force JSON output
-    )
-    
-    raw = response.choices[0].message.content.strip()
-    # Clean markdown if present
-    import re
-    raw = re.sub(r"^```json\s*", "", raw)
-    raw = re.sub(r"```$", "", raw)
-    return json.loads(raw)
+    try:
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {"role": "system", "content": "You are a fact-checking AI. Always respond with valid JSON only."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.1,
+            response_format={"type": "json_object"}
+        )
+        
+        raw = response.choices[0].message.content.strip()
+        
+        # Clean markdown
+        raw = re.sub(r"^```json\s*", "", raw)
+        raw = re.sub(r"```$", "", raw)
+        raw = re.sub(r"^```\s*", "", raw)
+        
+        # Parse JSON
+        data = json.loads(raw)
+        
+        # Handle different response formats
+        if isinstance(data, dict):
+            if "claims" in data:
+                claims_data = data["claims"]
+            elif "results" in data:
+                claims_data = data["results"]
+            else:
+                # Check if any value is a list
+                claims_data = []
+                for value in data.values():
+                    if isinstance(value, list):
+                        claims_data = value
+                        break
+        elif isinstance(data, list):
+            claims_data = data
+        else:
+            claims_data = []
+        
+        # Validate each claim
+        validated = []
+        for claim in claims_data:
+            if isinstance(claim, dict) and all(k in claim for k in ["claim", "status", "explanation"]):
+                validated.append(claim)
+        
+        return validated
+        
+    except Exception as e:
+        st.error(f"API Error: {str(e)}")
+        return []
 
 
 # ── UI ────────────────────────────────────────────────────────────────────────
@@ -284,38 +321,34 @@ if run:
             doc_text = extract_text_from_pdf(uploaded_file)
 
         if len(doc_text.strip()) < 50:
-            st.error("Could not extract readable text. Try a text-based PDF.")
+            st.error("⚠️ Could not extract readable text. Try a text-based PDF.")
         else:
             with st.spinner("🤖 Groq AI is analyzing claims..."):
-                try:
-                    claims = analyze_claims(doc_text, api_key)
-                except Exception as e:
-                    st.error(f"Analysis failed: {e}")
-                    claims = []
+                claims = analyze_claims(doc_text, api_key)
 
-            if claims:
-                verified   = [c for c in claims if c["status"] == "Verified"]
-                inaccurate = [c for c in claims if c["status"] == "Inaccurate"]
-                false_     = [c for c in claims if c["status"] == "False"]
+            if claims and len(claims) > 0:
+                verified   = [c for c in claims if c.get("status") == "Verified"]
+                inaccurate = [c for c in claims if c.get("status") == "Inaccurate"]
+                false_     = [c for c in claims if c.get("status") == "False"]
 
                 st.markdown('<div class="section-label">📊 Summary</div>', unsafe_allow_html=True)
-                c1, c2, c3, c4 = st.columns(4)
-                with c1:
+                col1, col2, col3, col4 = st.columns(4)
+                with col1:
                     st.markdown(f"""<div class="stat-box">
                         <div class="stat-number" style="color:#e8e8f0">{len(claims)}</div>
                         <div class="stat-label">Total Claims</div>
                     </div>""", unsafe_allow_html=True)
-                with c2:
+                with col2:
                     st.markdown(f"""<div class="stat-box">
                         <div class="stat-number" style="color:#34d399">{len(verified)}</div>
                         <div class="stat-label">Verified</div>
                     </div>""", unsafe_allow_html=True)
-                with c3:
+                with col3:
                     st.markdown(f"""<div class="stat-box">
                         <div class="stat-number" style="color:#fbbf24">{len(inaccurate)}</div>
                         <div class="stat-label">Inaccurate</div>
                     </div>""", unsafe_allow_html=True)
-                with c4:
+                with col4:
                     st.markdown(f"""<div class="stat-box">
                         <div class="stat-number" style="color:#f87171">{len(false_)}</div>
                         <div class="stat-label">False</div>
@@ -325,21 +358,22 @@ if run:
                 st.markdown('<div class="section-label">🔎 Detailed Results</div>', unsafe_allow_html=True)
 
                 for status_key, css_key, heading in [
-                    ("False",      "false",      "🚨 FALSE CLAIMS"),
+                    ("False", "false", "🚨 FALSE CLAIMS"),
                     ("Inaccurate", "inaccurate", "⚠️ INACCURATE CLAIMS"),
-                    ("Verified",   "verified",   "✅ VERIFIED CLAIMS"),
+                    ("Verified", "verified", "✅ VERIFIED CLAIMS"),
                 ]:
-                    group = [c for c in claims if c["status"] == status_key]
-                    if not group:
-                        continue
-                    st.markdown(f"**{heading}** ({len(group)})")
-                    for item in group:
-                        st.markdown(f"""
+                    group = [c for c in claims if c.get("status") == status_key]
+                    if group:
+                        st.markdown(f"**{heading}** ({len(group)})")
+                        for item in group:
+                            st.markdown(f"""
 <div class="card card-{css_key}">
     <span class="badge badge-{css_key}">{status_key}</span>
-    <div class="claim-text">"{item['claim']}"</div>
-    <div class="explanation">→ {item['explanation']}</div>
+    <div class="claim-text">"{item.get('claim', 'N/A')}"</div>
+    <div class="explanation">→ {item.get('explanation', 'No explanation')}</div>
 </div>""", unsafe_allow_html=True)
-                    st.markdown("<br>", unsafe_allow_html=True)
+                        st.markdown("<br>", unsafe_allow_html=True)
+            else:
+                st.warning("⚠️ No valid claims were extracted from the document. Please try a different PDF or check the content format.")
 
 st.markdown('<div class="footer-text">FACTGUARD AI · POWERED BY GROQ · BUILT FOR COG CULTURE ASSESSMENT</div>', unsafe_allow_html=True)
