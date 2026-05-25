@@ -3,6 +3,7 @@ import fitz  # PyMuPDF
 from groq import Groq
 import json
 import re
+import os
 
 # ── Page config ──────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -256,7 +257,6 @@ Document text:
             elif "results" in data:
                 claims_data = data["results"]
             else:
-                # Check if any value is a list
                 claims_data = []
                 for value in data.values():
                     if isinstance(value, list):
@@ -282,6 +282,27 @@ Document text:
 
 # ── UI ────────────────────────────────────────────────────────────────────────
 
+# ✅ FIX: API key automatically read from secrets (user ko nahi mangni)
+try:
+    # Try to get API key from Streamlit secrets (production)
+    api_key = st.secrets["GROQ_API_KEY"]
+except:
+    # Fallback for local development (optional)
+    api_key = os.environ.get("GROQ_API_KEY", "")
+    
+    # If still no key, show setup instructions (not ask user)
+    if not api_key:
+        st.error("""
+        ⚠️ **API Key Missing**
+        
+        Please add your Groq API key to Streamlit Secrets:
+        1. Go to your app settings on Streamlit Cloud
+        2. Add secret: `GROQ_API_KEY` = `your_key_here`
+        
+        *For local development: set environment variable `GROQ_API_KEY`*
+        """)
+        st.stop()
+
 st.markdown("""
 <div class="hero-section">
     <div class="main-title">FactGuard AI</div>
@@ -289,15 +310,7 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-st.markdown('<div class="section-label">🔑 Configuration</div>', unsafe_allow_html=True)
-api_key = st.text_input(
-    "Groq API Key",
-    type="password",
-    placeholder="Paste your Groq API key here...",
-    help="Get your free key at console.groq.com",
-)
-
-st.markdown("<br>", unsafe_allow_html=True)
+# ❌ Removed API key input field - ab user se nahi mangega
 
 st.markdown('<div class="section-label">📄 Upload Document</div>', unsafe_allow_html=True)
 uploaded_file = st.file_uploader(
@@ -312,9 +325,7 @@ st.markdown("<br>", unsafe_allow_html=True)
 run = st.button("🔍 ANALYZE & FACT-CHECK")
 
 if run:
-    if not api_key:
-        st.error("⚠️ Please enter your Groq API key above.")
-    elif not uploaded_file:
+    if not uploaded_file:
         st.error("⚠️ Please upload a PDF document first.")
     else:
         with st.spinner("Extracting text from PDF..."):
