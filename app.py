@@ -1,9 +1,8 @@
 import streamlit as st
 import fitz  # PyMuPDF
-import google.generativeai as genai
+from google import genai
 import json
 import re
-import time
 
 # ── Page config ──────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -61,16 +60,6 @@ html, body, [data-testid="stAppViewContainer"] {
     padding: 3rem 1rem 2rem;
     border-bottom: 1px solid rgba(167, 139, 250, 0.15);
     margin-bottom: 2.5rem;
-}
-
-.upload-zone {
-    border: 2px dashed rgba(167, 139, 250, 0.4);
-    border-radius: 16px;
-    padding: 2rem;
-    text-align: center;
-    background: rgba(167, 139, 250, 0.04);
-    transition: all 0.3s ease;
-    margin-bottom: 1.5rem;
 }
 
 .card {
@@ -160,11 +149,6 @@ html, body, [data-testid="stAppViewContainer"] {
     border-bottom: 1px solid rgba(255,255,255,0.06);
 }
 
-[data-testid="stFileUploader"] {
-    background: rgba(167,139,250,0.05) !important;
-    border-radius: 12px;
-}
-
 div.stButton > button {
     width: 100%;
     background: linear-gradient(135deg, #7c3aed, #2563eb);
@@ -184,19 +168,6 @@ div.stButton > button {
 div.stButton > button:hover {
     transform: translateY(-2px);
     box-shadow: 0 8px 30px rgba(124, 58, 237, 0.6);
-}
-
-.stTextInput input {
-    background: rgba(255,255,255,0.06) !important;
-    border: 1px solid rgba(255,255,255,0.12) !important;
-    border-radius: 10px !important;
-    color: #e8e8f0 !important;
-    font-family: 'Space Mono', monospace !important;
-    font-size: 0.85rem !important;
-}
-
-.stSpinner > div {
-    border-top-color: #a78bfa !important;
 }
 
 .footer-text {
@@ -219,12 +190,8 @@ def extract_text_from_pdf(uploaded_file) -> str:
     return "\n".join(page.get_text() for page in doc)
 
 
-def analyze_claims(text: str, api_key: str) -> list[dict]:
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel(
-        "gemini-2.0-flash",
-        generation_config={"response_mime_type": "application/json"},
-    )
+def analyze_claims(text: str, api_key: str) -> list:
+    client = genai.Client(api_key=api_key)
 
     prompt = f"""
 You are an expert fact-checker AI. Analyze the following document text and:
@@ -236,7 +203,7 @@ You are an expert fact-checker AI. Analyze the following document text and:
    - Technical/scientific claims
    - Financial figures
 
-2. For EACH claim, verify it using your knowledge up to your training cutoff AND flag if it seems outdated or potentially false.
+2. For EACH claim, verify it using your knowledge and flag if it seems outdated or potentially false.
 
 3. Classify each claim as:
    - "Verified" — claim is accurate and matches known data
@@ -248,8 +215,7 @@ Return a JSON array of objects. Each object must have EXACTLY these keys:
 - "status": one of "Verified", "Inaccurate", or "False" (string)
 - "explanation": brief explanation of your verdict, including the correct fact if wrong (string)
 
-Extract at least 5 claims. If the document has fewer verifiable claims, extract all of them.
-Return ONLY valid JSON. No markdown, no preamble.
+Extract at least 5 claims. Return ONLY valid JSON. No markdown, no preamble.
 
 Document text:
 \"\"\"
@@ -257,7 +223,11 @@ Document text:
 \"\"\"
 """
 
-    resp = model.generate_content(prompt)
+    resp = client.models.generate_content(
+        model="gemini-2.0-flash",
+        contents=prompt,
+    )
+
     raw = resp.text.strip()
     raw = re.sub(r"^```json\s*", "", raw)
     raw = re.sub(r"```$", "", raw)
@@ -266,7 +236,6 @@ Document text:
 
 # ── UI ────────────────────────────────────────────────────────────────────────
 
-# Hero
 st.markdown("""
 <div class="hero-section">
     <div class="main-title">FactGuard AI</div>
@@ -274,7 +243,6 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# API Key input
 st.markdown('<div class="section-label">🔑 Configuration</div>', unsafe_allow_html=True)
 api_key = st.text_input(
     "Gemini API Key",
@@ -285,22 +253,18 @@ api_key = st.text_input(
 
 st.markdown("<br>", unsafe_allow_html=True)
 
-# Upload
 st.markdown('<div class="section-label">📄 Upload Document</div>', unsafe_allow_html=True)
 uploaded_file = st.file_uploader(
     "Drop a PDF to fact-check",
     type=["pdf"],
-    help="Upload any PDF — research papers, reports, marketing content, news articles.",
 )
 
 if uploaded_file:
     st.success(f"✅ Loaded: **{uploaded_file.name}**")
 
 st.markdown("<br>", unsafe_allow_html=True)
-
 run = st.button("🔍 ANALYZE & FACT-CHECK")
 
-# ── Analysis ──────────────────────────────────────────────────────────────────
 if run:
     if not api_key:
         st.error("⚠️ Please enter your Gemini API key above.")
@@ -311,7 +275,7 @@ if run:
             doc_text = extract_text_from_pdf(uploaded_file)
 
         if len(doc_text.strip()) < 50:
-            st.error("Could not extract readable text from this PDF. Try a text-based PDF.")
+            st.error("Could not extract readable text. Try a text-based PDF.")
         else:
             with st.spinner("🤖 Gemini AI is analyzing claims..."):
                 try:
@@ -325,7 +289,6 @@ if run:
                 inaccurate = [c for c in claims if c["status"] == "Inaccurate"]
                 false_     = [c for c in claims if c["status"] == "False"]
 
-                # Stats
                 st.markdown('<div class="section-label">📊 Summary</div>', unsafe_allow_html=True)
                 c1, c2, c3, c4 = st.columns(4)
                 with c1:
@@ -350,26 +313,21 @@ if run:
                     </div>""", unsafe_allow_html=True)
 
                 st.markdown("<br>", unsafe_allow_html=True)
-
-                # Results
                 st.markdown('<div class="section-label">🔎 Detailed Results</div>', unsafe_allow_html=True)
 
-                status_order = [
+                for status_key, css_key, heading in [
                     ("False",      "false",      "🚨 FALSE CLAIMS"),
                     ("Inaccurate", "inaccurate", "⚠️ INACCURATE CLAIMS"),
                     ("Verified",   "verified",   "✅ VERIFIED CLAIMS"),
-                ]
-
-                for status_key, css_key, heading in status_order:
+                ]:
                     group = [c for c in claims if c["status"] == status_key]
                     if not group:
                         continue
                     st.markdown(f"**{heading}** ({len(group)})")
                     for item in group:
-                        badge_html  = f'<span class="badge badge-{css_key}">{status_key}</span>'
                         st.markdown(f"""
 <div class="card card-{css_key}">
-    {badge_html}
+    <span class="badge badge-{css_key}">{status_key}</span>
     <div class="claim-text">"{item['claim']}"</div>
     <div class="explanation">→ {item['explanation']}</div>
 </div>""", unsafe_allow_html=True)
